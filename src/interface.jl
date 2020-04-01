@@ -10,8 +10,9 @@ function energy end
 """
     propose_candidate(configuration)
 
-Return a candidate configuration based on the current configuration given.
-Return both the candidate configuration and the energy difference between it
-and the current configuration.
+Return tuple containing a neighboring configuration (a new candidate) and
+the energy difference between the candidate and the original configuration.
+The energy difference should be equivalent to `energy(candidate) -
+energy(configuration)`
 """
 function propose_candidate end

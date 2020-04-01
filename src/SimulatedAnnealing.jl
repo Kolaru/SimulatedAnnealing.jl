@@ -2,14 +2,14 @@ module SimulatedAnnealing
 
 using Statistics
 
-export SimulatedAnnealing, AnnealingState
-export SA_optimize
+export AnnealingOptimization, AnnealingState
+export simulated_annealing
 
 
 include("interface.jl")
 
 """
-    SimulatedAnnealing{C}
+    AnnealingOptimization{C}
 
 Object representing an optimization done using a Simulated Annealing
 algorithm.
@@ -38,7 +38,7 @@ Fields
 - `distance_parameter`: Parameter controlling the speed of the temperature decrement.
 - `stop_parameter`: Parameter determining the stop criterion.
 """
-struct SimulatedAnnealing{C}
+struct AnnealingOptimization{C}
     initial_temperature::Float64
     initial_configuration::C
     energy_reference::Float64
@@ -49,7 +49,7 @@ end
 
 
 """
-    SimulatedAnnealing(samples, neighborhood_size, distance_parameter, stop_parameter)
+    AnnealingOptimization(samples, neighborhood_size, distance_parameter, stop_parameter)
 
 Given samples of the configuration space, determine the initial temperature
 as well as the energy reference automatically. The first sample is used as
@@ -58,9 +58,9 @@ initial configuration.
 Initial temperature is the standard deviation of the energy in the sample,
 according to White criterion (see eq. 2.36 in Varanelli).
 """
-function SimulatedAnnealing(samples::Vector{C}, ns, dp, sp) where C
+function AnnealingOptimization(samples::Vector{C}, ns, dp, sp) where C
     energies = energy.(samples)
-    return SimulatedAnnealing{C}(
+    return AnnealingOptimization{C}(
         std(energies),
         samples[1],
         mean(energies),
@@ -103,18 +103,22 @@ function AnnealingState(temperature, configuration)
 end
 
 
-Base.eltype(::Type{SA}) where {C, SA <: SimulatedAnnealing{C}} = AnnealingState{C}
-Base.IteratorSize(::Type{SA}) where {SA <: SimulatedAnnealing} = Base.SizeUnknown()
+Base.eltype(::Type{SA}) where {C, SA <: AnnealingOptimization{C}} = AnnealingState{C}
+Base.IteratorSize(::Type{SA}) where {SA <: AnnealingOptimization} = Base.SizeUnknown()
 
 function Base.iterate(
-    search::SimulatedAnnealing{C},
-    state=AnnealingState(C, search.initial_temperature, search.initial_configuration)) where C
+    search::AnnealingOptimization{C},
+    state=AnnealingState(search.initial_temperature, search.initial_configuration)) where C
 
     state.stop_measure < search.stop_parameter && return nothing
 
     # Initialize all internal loop variables
     configuration = state.current_configuration
-    E = state.current_energy
+    E = energy(configuration)
+
+    if E < 0
+        error()
+    end
 
     bsf = state.bsf_configuration
     bsf_energy = state.bsf_energy
@@ -126,6 +130,12 @@ function Base.iterate(
         candidate, dE = propose_candidate(configuration)
 
         if dE < 0 || rand() < exp(dE/state.temperature)
+            if !(energy(candidate) - energy(configuration) ≈ dE) && abs(dE) > 1e-10
+                @show energy(configuration)
+                @show energy(candidate)
+                @show dE
+                error()
+            end
             configuration = candidate
             E += dE
 
@@ -141,8 +151,8 @@ function Base.iterate(
     μ = mean(energies)
     σ = std(energies)
 
-    μ0 = state.energy_reference
-    dμ = μ0 - μ
+    μ0 = search.energy_reference
+    dμ = μ0
 
     # Otten-van Ginneken stop criterion (eq. 2.47 in Varanelli)
     if dμ >= 0
@@ -153,30 +163,33 @@ function Base.iterate(
     
     T = decrement_rule(state.temperature, σ, search.distance_parameter)
 
-    new_state = AnnealingState(T, μ0, stop_measure, configuration, E,
-                               bsf, bsf_energy, energies)
+    new_state = AnnealingState(T, configuration, E,
+                               bsf, bsf_energy,
+                               energies, stop_measure)
 
     return new_state, new_state
 end
 
 
-"Aarts and van Laarhoven temperature decrement rule (eq. 2.41 in Varanelli)."
+"Aarts and van Laarhoven temperature decrement rule (eq. 2.42 in Varanelli)."
 decrement_rule(T, σ, δ) = T/(1 + T*log(1 + δ)/3σ)
 
 
-function SA_optimize(samples::Vector{C},
-                     neighborhood_size ;
-                     n_thermal_sample=1000,
-                     distance_parameter=0.085,
-                     stop_parameter=0.0001) where C
+function simulated_annealing(samples::Vector{C},
+                             neighborhood_size ;
+                             distance_parameter=0.085,
+                             stop_parameter=0.0001) where C
 
-    search = SimulatedAnnealing(samples, neighborhood_size,
-                                distance_parameter, stop_parameter)
+    search = AnnealingOptimization(samples, neighborhood_size,
+                                   distance_parameter, stop_parameter)
     
     local state = nothing  # Avoid being shadowed inside the loop
 
     for s in search  # Go to the end of the search
         state = s
+        r = state.stop_measure / search.stop_parameter
+        @show mean(state.energies)
+        @show std(state.energies)
     end
 
     return state.bsf_configuration, state.bsf_energy
