@@ -28,7 +28,7 @@ documentation for details).
 The object is iterable to allow access to the internal state during the
 optimization process. The iteration stops when the stop measure given by
 Otten-van Ginneken criterion (eq. 2.47 in Varanelli) falls below the
-`stop_parameter`.
+`stop_threshold`.
 
 
 Fields
@@ -36,7 +36,7 @@ Fields
 - `initial_temperature`
 - `neighborhood_size::Int`: Number of states that can be accessed from a given one.
 - `distance_parameter`: Parameter controlling the speed of the temperature decrement.
-- `stop_parameter`: Parameter determining the stop criterion.
+- `stop_threshold`: Parameter determining the stop criterion.
 """
 struct AnnealingOptimization{C}
     initial_temperature::Float64
@@ -44,12 +44,12 @@ struct AnnealingOptimization{C}
     energy_reference::Float64
     neighborhood_size::Int
     distance_parameter::Float64
-    stop_parameter::Float64
+    stop_threshold::Float64
 end
 
 
 """
-    AnnealingOptimization(samples, neighborhood_size, distance_parameter, stop_parameter)
+    AnnealingOptimization(samples, neighborhood_size, distance_parameter, stop_threshold)
 
 Given samples of the configuration space, determine the initial temperature
 as well as the energy reference automatically. The first sample is used as
@@ -61,7 +61,7 @@ according to White criterion (see eq. 2.36 in Varanelli).
 function AnnealingOptimization(samples::Vector{C}, ns, dp, sp) where C
     energies = energy.(samples)
     return AnnealingOptimization{C}(
-        std(energies),
+        10*std(energies),
         samples[1],
         mean(energies),
         ns, dp, sp)
@@ -110,16 +110,11 @@ function Base.iterate(
     search::AnnealingOptimization{C},
     state=AnnealingState(search.initial_temperature, search.initial_configuration)) where C
 
-    state.stop_measure < search.stop_parameter && return nothing
+    state.stop_measure < search.stop_threshold && return nothing
 
     # Initialize all internal loop variables
     configuration = state.current_configuration
     E = energy(configuration)
-
-    if E < 0
-        error()
-    end
-
     bsf = state.bsf_configuration
     bsf_energy = state.bsf_energy
     
@@ -129,13 +124,7 @@ function Base.iterate(
     for k in 1:search.neighborhood_size
         candidate, dE = propose_candidate(configuration)
 
-        if dE < 0 || rand() < exp(dE/state.temperature)
-            if !(energy(candidate) - energy(configuration) ≈ dE) && abs(dE) > 1e-10
-                @show energy(configuration)
-                @show energy(candidate)
-                @show dE
-                error()
-            end
+        if dE < 0 || rand() < exp(-dE/state.temperature)
             configuration = candidate
             E += dE
 
@@ -178,18 +167,16 @@ decrement_rule(T, σ, δ) = T/(1 + T*log(1 + δ)/3σ)
 function simulated_annealing(samples::Vector{C},
                              neighborhood_size ;
                              distance_parameter=0.085,
-                             stop_parameter=0.0001) where C
+                             stop_threshold=0.0001) where C
 
     search = AnnealingOptimization(samples, neighborhood_size,
-                                   distance_parameter, stop_parameter)
+                                   distance_parameter, stop_threshold)
     
     local state = nothing  # Avoid being shadowed inside the loop
 
     for s in search  # Go to the end of the search
         state = s
-        r = state.stop_measure / search.stop_parameter
-        @show mean(state.energies)
-        @show std(state.energies)
+        r = state.stop_measure / search.stop_threshold
     end
 
     return state.bsf_configuration, state.bsf_energy

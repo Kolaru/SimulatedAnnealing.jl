@@ -50,15 +50,18 @@ random indices.
 """
 function SimulatedAnnealing.propose_candidate(tour::Tour)
     n = length(tour.order)
-    i1, i2 = rand(1:n, 2)  # Indices between which the order is reversed
     order = copy(tour.order)
+
+    # Order will be reversed between i1 and i2 included
+    i1 = rand(1:n)
+    i2 = mod1(rand(1:n-1) + i1, n)  # Make sure i1 != i2
     
     # Make sure that i1 < i2
     if i1 > i2
         i1, i2 = i2, i1
     end
 
-    if i1 == 1 && i2 == 12
+    if i1 == 1 && i2 == n
         return Tour(order, tour.D), 0.0
     end
 
@@ -73,6 +76,8 @@ function SimulatedAnnealing.propose_candidate(tour::Tour)
           - tour.D[city_a1, city_b1] - tour.D[city_a2, city_b2])
 
     order[i1:i2] = reverse(order[i1:i2])
+        
+    dE = energy(Tour(order, tour.D)) - energy(tour)
 
     return Tour(order, tour.D), dE
 end
@@ -92,7 +97,7 @@ n = size(D, 1)
 samples = [Tour(D) for _ in 1:1000]
 
 # Run the algorithm with default parameters
-best_tour, tour_length = simulated_annealing(samples, 10n*(n - 1))
+best_tour, tour_length = simulated_annealing(samples, n*(n - 1))
 
 println("Shortest tour length $tour_length, for the order:")
 println("$(best_tour.order)")
