@@ -98,6 +98,3 @@ samples = [Tour(D) for _ in 1:1000]
 
 # Run the algorithm with default parameters
 best_tour, tour_length = simulated_annealing(samples, n*(n - 1))
-
-println("Shortest tour length $tour_length, for the order:")
-println("$(best_tour.order)")
