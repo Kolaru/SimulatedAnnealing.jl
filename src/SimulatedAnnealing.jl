@@ -140,8 +140,6 @@ Base.IteratorSize(::Type{A}) where {A <: AnnealingOptimization} = Base.SizeUnkno
 function Base.iterate(
         search::AnnealingOptimization{T},
         state=initial_state(search)) where T
-    println(state.bsf_energy)
-
     length(state.energies) > 0 && search.stop_criterion(state) && return nothing
 
     # Initialize all internal loop variables
