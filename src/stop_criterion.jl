@@ -28,8 +28,6 @@ function (criterion::OVGCriterion)(state::AnnealingState)
         stop_measure = Inf
     end
 
-    println(stop_measure)
-
     return stop_measure < criterion.threshold
 end
 

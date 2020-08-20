@@ -9,7 +9,7 @@ Parameters
 factor: the constant factor multiplying the temperature.
 """
 @with_kw struct ConstantDecrementRule{T}
-    factor::T = 0.95
+    factor::T = 0.9
 end
 
 function (decrement_rule::ConstantDecrementRule)(state::AnnealingState)
