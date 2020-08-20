@@ -31,7 +31,7 @@ Tour(D::Matrix) = Tour(randcycle(size(D, 1)), D)
 Compute the energy of a `Tour` by summing the distances of successive cities
 in the tour.
 """
-function SimulatedAnnealing.energy(tour::Tour)
+function energy(tour::Tour)
     s = 0.0
 
     for (k, c1) in enumerate(tour.order)
@@ -48,7 +48,7 @@ end
 Propose a new candidate `Tour` by reversing the order of cities between two
 random indices.
 """
-function SimulatedAnnealing.propose_candidate(tour::Tour)
+function propose_candidate(tour::Tour)
     n = length(tour.order)
     order = copy(tour.order)
 
@@ -97,4 +97,5 @@ n = size(D, 1)
 samples = [Tour(D) for _ in 1:1000]
 
 # Run the algorithm with default parameters
-best_tour, tour_length = simulated_annealing(samples, n*(n - 1))
+prob = AnnealingOptimization(energy, propose_candidate, samples, n*(n - 1))
+best_tour, tour_length = simulated_annealing(prob)
